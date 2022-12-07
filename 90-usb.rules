@@ -1,0 +1,1 @@
+SUBSYSTEM=="usb", ACTION=="add", ENV{DEVTYPE}=="usb_device",  RUN+="/bin/udev.sh $env{ID_PATH}"
