@@ -7,3 +7,5 @@ echo "usb device connected $1" >> /tmp/snip.txt
 
 #progress bar: (percentage estimated with sizeprobe value)
 #dcfldd if=/dev/zero of=/dev/sda status=on sizeprobe=of
+
+#sudo ./arcconf getconfig 1 ld | grep -A 18 '<identifier>' | grep 'Slot:'
