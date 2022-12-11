@@ -91,9 +91,9 @@ chown eraser $status_file
 
 if [[ "$health_os" == "OK" ]] && [ "0" -eq $health_controller ]
 then
-        echo " S.M.A.R.T. Health: OK" >> $status_file
+        echo "Zustand Datenträger: Gut " >> $status_file
 else
-	echo " S.M.A.R.T. Health: Not OK - remove disk" >> $status_file
+	echo "Zustand Datenträger: Defekt - Datenträger entfernen" >> $status_file
 	exit 0
 fi
 
@@ -105,15 +105,23 @@ progress_file="/home/eraser/diskwiper_gui/snips/progress${l_slot}.txt"
 
 #deletion:
 dcfldd if=/dev/zero of=${DEVNAME} status=on sizeprobe=of statusinterval=25600 &> $tmp_file &
+#sleep 5 &
 dd_id=$!
-start_date=`date`
+
+#LC_ALL=de_DE.utf8 date #local format for date
+start_date=`date +"%d.%m.%Y-%T"`
 echo $dd_id >> /home/eraser/diskwiper_gui/test.txt
 while kill -0 "$dd_id" >/dev/null 2>&1; do
 	echo "loop" >> /home/eraser/diskwiper_gui/test.txt
 	x=`cat $tmp_file`
 	y=${x##*[}
-	echo "["${y%%.*} > $progress_file
-	echo "$start_date" >> $progress_file
+	
+	#write only if tmp is not currently empty
+	if [ ! -z "$y" ]
+	then
+		echo "Löschvorgang gestartet ($start_date)" > $progress_file
+		echo "["${y%%.*} >> $progress_file
+	fi
 	echo "" > $tmp_file 	#long string
 	chown eraser $progress_file
 	sleep 10
@@ -126,10 +134,11 @@ exit_state=$?
 if [ $exit_state -gt 0 ]
 then
 	echo "Löschvorgang auf Slot $l_slot abgebrochen." >> /home/eraser/diskwiper_gui/snips/error_msg.txt
+	echo "Löschvorgang abgebrochen" > $progress_file
 	exit 1
 fi
 
-echo "Löschung abgeschlossen - Log File ${serial}.txt geschrieben." > $progress_file
+echo "Löschvorgang abgeschlossen - Log-Datei ${serial}.txt geschrieben." > $progress_file
 chown eraser $progress_file
 
 ##############################################################################################
@@ -147,13 +156,13 @@ fi
 log_file="/home/eraser/diskwiper_gui/logs/${dirname}/${serial}.txt"
 
 disk_info=`sudo ./bin/arcconf getconfig 1 pd | grep -A 5 -B 2 $serial`
-end_date=`date`
+end_date=`date +"%d.%m.%Y-%T"`
 
-echo "Löschung abgeschlossen - einmaliges Überschreiben mit 0 en." > $log_file
-echo "Start: $start_date" >> $log_file
-echo "Abgeschlossen: $end_date" >> $log_file
+echo "Löschung des Datenträgers durch einmaliges Überschreiben mit nullen." > $log_file
+echo "Start des Löschvorgangs: $start_date" >> $log_file
+echo "Löschvorgang abgeschlossen am: $end_date" >> $log_file
 echo "-----------------------------------------------------------" >> $log_file
-echo "Gerät:">> $log_file
+echo "Geräteinformationen:">> $log_file
 echo  "$disk_info">>$log_file
 echo "-----------------------------------------------------------" >> $log_file
 echo "S.M.A.R.T.-Werte" >> $log_file
