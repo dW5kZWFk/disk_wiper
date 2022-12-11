@@ -1,0 +1,2 @@
+SUBSYSTEM=="block", ACTION=="add", ENV{DEVTYPE}=="disk", RUN+="/bin/add_disk_wrapper.sh $env{SCSI_IDENT_SERIAL} $env{DEVNAME}"
+SUBSYSTEM=="block", ACTION=="remove", ENV{DEVTYPE}=="disk", RUN+="/bin/remove_disk.sh"
