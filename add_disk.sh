@@ -30,7 +30,7 @@ then
 fi
 
 #S.M.A.R.T with smartctl:
-health_os=`smartctl -d scsi --all $2 | grep 'SMART Health Status'`
+health_os=`sudo smartctl -d scsi --all $2 | grep 'SMART Health Status'`
 health_os=${health_os##*:}
 health_os=`echo $health_os | tr -d ' '`
 
@@ -86,7 +86,12 @@ esac
 ####################################################################
 #Statusanzeige - Verbinden
 status_file="/home/eraser/diskwiper_gui/snips/status${l_slot}.txt"
+progress_file="/home/eraser/diskwiper_gui/snips/progress${l_slot}.txt"
+
+
 echo "verbunden" > $status_file
+echo "" > $progress_file
+
 chown eraser $status_file
 
 if [[ "$health_os" == "OK" ]] && [ "0" -eq $health_controller ]
@@ -101,10 +106,9 @@ fi
 #Löschen und Progress
 
 tmp_file="/home/eraser/diskwiper_gui/snips/tmp${l_slot}.txt"
-progress_file="/home/eraser/diskwiper_gui/snips/progress${l_slot}.txt"
 
 #deletion:
-dcfldd if=/dev/zero of=${DEVNAME} status=on sizeprobe=of statusinterval=25600 &> $tmp_file &
+dcfldd if=/dev/zero of=$2 status=on sizeprobe=of statusinterval=25600 &> $tmp_file &
 #sleep 5 &
 dd_id=$!
 
@@ -127,16 +131,32 @@ while kill -0 "$dd_id" >/dev/null 2>&1; do
 	sleep 10
 done
 
+echo "löschprozess beendet" >> /home/eraser/diskwiper_gui/snips/error_msg.txt
 #Abbruch des Vorgangs:
-wait $dd_id
-exit_state=$?
+#wait $dd_id
+#exit_state=$?
 
-if [ $exit_state -gt 0 ]
+cat $status_file | grep "nicht verbunden"
+disconnected=$?
+echo "disconnected: $disconnected" >> /home/eraser/diskwiper_gui/snips/error_msg.txt
+
+if [ $disconnected -eq 0 ]
 then
-	echo "Löschvorgang auf Slot $l_slot abgebrochen." >> /home/eraser/diskwiper_gui/snips/error_msg.txt
-	echo "Löschvorgang abgebrochen" > $progress_file
+	echo "Löschvorgang auf Slot $l_slot abgebrochen. `date`" >> /home/eraser/diskwiper_gui/snips/error_msg.txt
+	echo "Löschvorgang abgebrochen." > $progress_file
 	exit 1
 fi
+
+#echo "Verifikation des Löschvorgangs....." > $progress_file
+#dcfldd if=/dev/zero vf=${DEVNAME}
+#exit_state=$?
+#echo "exit_state (Verifikation): $exit_state Slot $l_slot" >> /home/eraser/diskwiper_gui/snips/error_msg.txt
+
+#if [ $exit_state -gt 0 ]
+#then 
+#	echo "Löschvorgang fehlgeschlagen. (Verifikation)" > $progress_file
+#	exit 1
+#fi
 
 echo "Löschvorgang abgeschlossen - Log-Datei ${serial}.txt geschrieben." > $progress_file
 chown eraser $progress_file
