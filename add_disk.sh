@@ -106,7 +106,7 @@ dcfldd if=/dev/zero of=$2 status=on sizeprobe=of statusinterval=25600 &> $tmp_fi
 dd_id=$!
 
 start_date=`date +"%d.%m.%Y-%T"`
-echo $dd_id >> /home/eraser/diskwiper_gui/test.txt
+
 while kill -0 "$dd_id" >/dev/null 2>&1; do
 	x=`cat $tmp_file`
 	y=${x##*[}
@@ -124,7 +124,6 @@ done
 
 cat $status_file | grep "nicht verbunden"
 disconnected=$?
-echo "disconnected: $disconnected" >> /home/eraser/diskwiper_gui/snips/error_msg.txt
 
 if [ $disconnected -eq 0 ]
 then
