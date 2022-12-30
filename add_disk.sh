@@ -3,38 +3,11 @@
 #$1: SCSI_IDENT (logical identifier RAID)
 #$2: DEVNAME (e.g. /dev/sda)
 
-echo "SCSI_IDENT: $1" >> /home/eraser/diskwiper_gui/test.txt 
 slot=`sudo ./bin/arcconf getconfig 1 ld | grep -A 18 $1 | grep 'Slot:'`
 
-#for testing:
-#slot=`sudo ./arcconf getconfig 1 ld | grep -A 18 $1 | grep 'Slot:'`
 
-
-##############################################################################################
 serial=${slot##*)}
 serial=`echo $serial | tr -d ' '`
-
-
-#S.M.A.R.T with Controller:
-health_controller=`sudo ./bin/arcconf getconfig 1 pd  | grep -A 9 $serial | grep 'S.M.A.R.T. warnings'`
-
-#for testing
-#health_controller=`sudo ./arcconf getconfig 1 pd  | grep -A 9 $serial | grep 'S.M.A.R.T. warnings'`
-
-
-health_controller=${health_controller##*:}
-
-if [ "0" -eq $health_controller ]
-then
-	echo "smart controller: OK"
-fi
-
-#S.M.A.R.T with smartctl:
-health_os=`sudo smartctl -d scsi --all $2 | grep 'SMART Health Status'`
-health_os=${health_os##*:}
-health_os=`echo $health_os | tr -d ' '`
-
-
 ##################################################################
 #map physical slots to logical (user) slots:
 slot=${slot##*:}
@@ -79,11 +52,31 @@ case $slot in
 		l_slot="4"
 		;;
 	*)
-		echo "Zuordnungsfehler" >> /home/eraser/diskwiper_gui/snips/error_msg.txt
+		#device is faulty and not registered as logical device
+		exit 0
 		;;
 esac
 
-####################################################################
+##############################################################################################
+
+
+#S.M.A.R.T with Controller:
+health_controller=`sudo ./bin/arcconf getconfig 1 pd  | grep -A 9 $serial | grep 'S.M.A.R.T. warnings'`
+
+health_controller=${health_controller##*:}
+
+if [ "0" -eq $health_controller ]
+then
+	echo "smart controller: OK"
+fi
+
+#S.M.A.R.T with smartctl:
+health_os=`sudo smartctl -d scsi --all $2 | grep 'SMART Health Status'`
+health_os=${health_os##*:}
+health_os=`echo $health_os | tr -d ' '`
+
+
+
 #Statusanzeige - Verbinden
 status_file="/home/eraser/diskwiper_gui/snips/status${l_slot}.txt"
 progress_file="/home/eraser/diskwiper_gui/snips/progress${l_slot}.txt"
@@ -112,11 +105,9 @@ dcfldd if=/dev/zero of=$2 status=on sizeprobe=of statusinterval=25600 &> $tmp_fi
 #sleep 5 &
 dd_id=$!
 
-#LC_ALL=de_DE.utf8 date #local format for date
 start_date=`date +"%d.%m.%Y-%T"`
 echo $dd_id >> /home/eraser/diskwiper_gui/test.txt
 while kill -0 "$dd_id" >/dev/null 2>&1; do
-	echo "loop" >> /home/eraser/diskwiper_gui/test.txt
 	x=`cat $tmp_file`
 	y=${x##*[}
 	
@@ -131,49 +122,39 @@ while kill -0 "$dd_id" >/dev/null 2>&1; do
 	sleep 10
 done
 
-echo "löschprozess beendet" >> /home/eraser/diskwiper_gui/snips/error_msg.txt
-#Abbruch des Vorgangs:
-#wait $dd_id
-#exit_state=$?
-
 cat $status_file | grep "nicht verbunden"
 disconnected=$?
 echo "disconnected: $disconnected" >> /home/eraser/diskwiper_gui/snips/error_msg.txt
 
 if [ $disconnected -eq 0 ]
 then
-	echo "Löschvorgang auf Slot $l_slot abgebrochen. `date`" >> /home/eraser/diskwiper_gui/snips/error_msg.txt
 	echo "Löschvorgang abgebrochen." > $progress_file
 	exit 1
 fi
 
-#echo "Verifikation des Löschvorgangs....." > $progress_file
-#dcfldd if=/dev/zero vf=${DEVNAME}
-#exit_state=$?
-#echo "exit_state (Verifikation): $exit_state Slot $l_slot" >> /home/eraser/diskwiper_gui/snips/error_msg.txt
-
-#if [ $exit_state -gt 0 ]
-#then 
-#	echo "Löschvorgang fehlgeschlagen. (Verifikation)" > $progress_file
-#	exit 1
-#fi
-
-echo "Löschvorgang abgeschlossen - Log-Datei ${serial}.txt geschrieben." > $progress_file
-chown eraser $progress_file
 
 ##############################################################################################
-#Log-File schreiben:
+#write Log-File:
 
 
 #create directory for current month, if it does not exist
 dirname=`date +"%m_%Y"`
 
-if [ ! -d /home/eraser/diskwiper_gui/logs/$dirname ]
+#check whether usb stick is mounted AND physically connected (if not default to local path for saving logs)
+if findmnt /media/logs >/dev/nul && ls -l /dev/disk/by-uuid | grep E8C8-4D1E >/dev/nul;
+	then
+		local=1
+		path=/media/logs/
+	else
+		path=/home/eraser/dskwiper_gui/logs/
+fi		
+
+if [ ! -d $path$dirname ]
 then
-		mkdir /home/eraser/diskwiper_gui/logs/$dirname
+		mkdir $path$dirname
 fi
 
-log_file="/home/eraser/diskwiper_gui/logs/${dirname}/${serial}.txt"
+log_file="${path}${dirname}/${serial}.txt"
 
 disk_info=`sudo ./bin/arcconf getconfig 1 pd | grep -A 5 -B 2 $serial`
 end_date=`date +"%d.%m.%Y-%T"`
@@ -197,6 +178,11 @@ echo "$smarts" >> $log_file
 
 chown eraser $log_file
 
-#echo $status_file >> "/home/eraser/diskwiper_gui/test.txt"
-#echo Slot: $slot >> /home/eraser/diskwiper_gui/test.txt
-#echo $2 >>/home/eraser/diskwiper_gui/test.txt
+if [[ $local -eq 1 ]]
+	then
+		echo "Löschvorgang abgeschlossen - Log-Datei ${serial}.txt gespeichert." > $progress_file
+	else
+		echo "Löschvorgang abgeschlossen - USB-Stick nicht verbunden. Log-Datei ${serial}.txt lokal gespeichert." > $progress_file
+fi
+
+chown eraser $progress_file
