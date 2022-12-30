@@ -1,0 +1,10 @@
+[Unit]
+Description=Start diskwiper gui
+PartOf=graphical-session-target
+
+[Service]
+ExecStart=/home/eraser/diskwiper_gui/start_gui.sh
+Type=oneshot
+
+[Install]
+WantedBy=graphical-session.target
