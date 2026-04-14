@@ -30,3 +30,5 @@ The file "status.html" displays the contents of all progress files for the slots
 </ul>
 
 <!--~/.config/systemd/user/wiper_gui.service (enable: systemctl --user enable wiper_gui) -->
+
+(This project was originally designed in German and the README translated.)
